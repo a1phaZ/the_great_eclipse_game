@@ -1,11 +1,11 @@
 {
-  "name": "the_great_eclipse_game_bot",
+  "name": "the Great Eclipse Game",
   "private": true,
   "devDependencies": {
     "@tgcloud/cli": "^0.2.0"
   },
   "scripts": {
-    "deploy": "tgcloud push",
+    "deploy": "tgcloud push && tgcloud migrate",
     "status": "tgcloud status",
     "run": "tgcloud run"
   }
