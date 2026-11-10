@@ -152,3 +152,34 @@ The platform manages the bot's webhook for you, derived from your deployed
 `handlers/*`, and refreshes it on `push`. If it ever drifts — e.g. someone called
 `setWebhook` with the raw bot token — `npx tgcloud webhook` shows the mismatch and
 `npx tgcloud webhook sync` repairs it.
+
+## Tests & content validation
+
+```bash
+npm test          # node:test: expression, state, engine, callback_data, content
+npm run validate  # content validator: targets, conditions, effects, limits
+```
+
+Tests import only pure modules (`lib/engine/`, `lib/content/`, `lib/world.js`,
+`lib/callback_data.js`); handlers/`telegram.js`/`persistence.js` import `sdk`
+and can't run locally. The validator uses the real `registry`, so it can't drift
+from the engine.
+
+## Game engine & content packs
+
+The game is a universal scene engine in `tgcloud/lib/engine/` plus one active
+content pack in `tgcloud/lib/content/`. `tgcloud/lib/content/index.js` selects
+the pack; `tgcloud/lib/world.js` builds the registry and engine.
+
+- `config.js` — resources, stats, vars, derived formulas, tables, routers,
+  death/recovery rules, strings, items, factions, locales.
+- `locations/*.js` — scenes with `text`, `imageUrl`, `transitions`
+  (`buttonText`, `condition`, `effects`, `target`).
+- State is JSON: `nav`, `resources`, `stats`, `vars`, `flags`, `inventory`, `meta`.
+- Targets: `location:scene`, `@table:name`, `@router:name`, `@var:path`.
+- Effects: `'+N'`, `'-N'`, `'=N'`, `'N'`, `MAX`, `MIN`, `CLEAR`, `TOGGLE`.
+- Text placeholders: `{resources.chips}`, `{repair_cost_full}`,
+  `{inventorySummary()}`.
+- Faction reputation lives in `vars` (`repNeoTek`, …); each entry in
+  `config.factions` names its `repVar` and `rewardItem`.
+

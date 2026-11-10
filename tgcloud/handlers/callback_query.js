@@ -1,70 +1,66 @@
-import { api, db } from 'sdk';
-import { eq } from 'sdk/db';
-import { sessions } from '../schema.js';
-import { GlobalGameStateMachine, WorldRegistry } from '../lib/engine.js';
-import { new_detroit as cityData } from '../lib/new_detroit.js';
-import { highwayData } from '../lib/highway_south.js';
-import { outpostData } from '../lib/rusty_outpost.js';
-import { fillSession } from '../lib/utils.js';
-import { ambushEventData } from '../lib/event_ambush.js';
-import { radioEventData } from '../lib/event_radio.js';
-import { bunkerQuestData } from '../lib/event_bunker.js';
-
-const registry = new WorldRegistry();
-registry.registerLocation('new_detroit', cityData);
-registry.registerLocation('highway_south', highwayData);
-registry.registerLocation('rusty_outpost', outpostData);
-registry.registerLocation('event_ambush', ambushEventData);
-registry.registerLocation('event_radio', radioEventData);
-registry.registerLocation('event_bunker', bunkerQuestData);
-
-const stateMachine = new GlobalGameStateMachine(registry);
+import { api } from 'sdk';
+import { config, engine } from '../lib/world.js';
+import { loadSession, saveSession } from '../lib/persistence.js';
+import { buildKeyboard, parseCallbackData } from '../lib/callback_data.js';
+import { editScene } from '../lib/telegram.js';
+import { resolveLocalized } from '../lib/engine/i18n.js';
 
 export default async function (callbackQuery) {
-    const userId = callbackQuery.from.id;
-    const callbackData = callbackQuery.data;
+  const userId = callbackQuery.from.id;
+  const callbackData = callbackQuery.data || '';
 
-    if (!callbackData.startsWith('click:')) return;
-    const targetIndex = Number(callbackData.split(':')[1]);
+  if (!callbackData.startsWith('click:')) return;
 
-    let playerRow = await db.select().from(sessions).where(eq(sessions.userId, userId)).get();
-    if (!playerRow) return;
+  const action = parseCallbackData(callbackData);
 
-    const session = fillSession(playerRow);
+  try {
+    const state = await loadSession(userId);
 
-    const result = stateMachine.processPlayerAction(session, { type: 'CLICK', targetIndex });
+    if (!state) {
+      await api.answerCallbackQuery({
+        callback_query_id: callbackQuery.id,
+        text: resolveLocalized(config.strings.sessionNotFound, config.defaultLocale, config.defaultLocale),
+      }).catch(() => {});
+      return;
+    }
 
-    await db.update(sessions)
-        .set({
-            currentState: result.nextSession.currentState,
-            currentLocationId: result.nextSession.currentLocationId,
-            currentSceneId: result.nextSession.currentSceneId,
-            chips: result.nextSession.chips,
-            truckHp: result.nextSession.truck.hp,
-            diesel: result.nextSession.diesel,
-            destinationTarget: result.nextSession.destinationTarget,
-            questParams: result.nextSession.questParams
-        })
-        .where(eq(sessions.userId, userId))
-        .run();
+    const locale = state.meta?.locale || config.defaultLocale;
 
-    const keyboard = {
-        inline_keyboard: result.buttons.map((text, idx) => [
-            { text: text, callback_data: `click:${idx}` }
-        ])
-    };
+    // Старый формат click:<idx> или кнопка из другого сообщения/сцены:
+    // такой клик не применяем, а просто перерисовываем актуальный экран.
+    const stale = action.legacy
+      || !action.locationId
+      || action.locationId !== state.nav.locationId
+      || action.sceneId !== state.nav.sceneId;
 
-    await api.answerCallbackQuery({ callback_query_id: callbackQuery.id });
+    const result = stale
+      ? { ...engine.processAction(state, { type: 'RENDER' }), stale: true }
+      : engine.processAction(state, { type: 'CLICK', ...action });
 
-    await api.editMessageMedia({
-        chat_id: callbackQuery.message.chat.id,
-        message_id: callbackQuery.message.message_id,
-        media: {
-            type: 'photo',
-            media: result.imageUrl,
-            caption: result.responseText,
-            parse_mode: 'Markdown'
-        },
-        reply_markup: keyboard
+    // Отвечаем сразу, чтобы у клиента не крутился спиннер. Если клик устарел
+    // или переход больше не проходит условие — показываем короткий toast.
+    const isStale = stale || result.stale === true;
+    await api.answerCallbackQuery({
+      callback_query_id: callbackQuery.id,
+      ...(isStale ? { text: resolveLocalized(config.strings.stale, locale, config.defaultLocale) } : {}),
+    }).catch((e) => {
+      console.error(`[callback] answer failed (user ${userId}):`, e?.description || e);
     });
+
+    await saveSession(userId, result.nextSession);
+
+    const keyboard = buildKeyboard(
+      result.nextSession.nav.locationId,
+      result.nextSession.nav.sceneId,
+      result.buttons,
+    );
+
+    await editScene(callbackQuery, result, keyboard);
+  } catch (e) {
+    console.error(`[callback] user ${userId}, data "${callbackData}":`, e);
+    await api.answerCallbackQuery({
+      callback_query_id: callbackQuery.id,
+      text: resolveLocalized(config.strings.genericError, config.defaultLocale, config.defaultLocale),
+    }).catch(() => {});
+  }
 }

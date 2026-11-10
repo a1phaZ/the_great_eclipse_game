@@ -1,53 +1,67 @@
-import { api, db } from 'sdk';
-import { eq } from 'sdk/db';
-import { sessions } from '../schema.js';
-import { GlobalGameStateMachine, WorldRegistry } from '../lib/engine.js';
-import { new_detroit as cityData } from '../lib/new_detroit.js';
-import { highwayData } from '../lib/highway_south.js';
-import { outpostData } from '../lib/rusty_outpost.js';
-import { fillSession } from '../lib/utils.js';
-import { ambushEventData } from '../lib/event_ambush.js';
-import { lootEventData } from '../lib/event_loot.js';
-import { radioEventData } from '../lib/event_radio.js';
-import { bunkerQuestData } from '../lib/event_bunker.js';
-
-
-const registry = new WorldRegistry();
-registry.registerLocation('new_detroit', cityData);
-registry.registerLocation('highway_south', highwayData);
-registry.registerLocation('rusty_outpost', outpostData);
-registry.registerLocation('event_ambush', ambushEventData);
-registry.registerLocation('event_loot', lootEventData);
-registry.registerLocation('event_radio', radioEventData);
-registry.registerLocation('event_bunker', bunkerQuestData);
-
-
-const stateMachine = new GlobalGameStateMachine(registry);
+import { api } from 'sdk';
+import { config, engine } from '../lib/world.js';
+import {
+  createSession,
+  loadSession,
+  resetSession,
+  saveSession,
+} from '../lib/persistence.js';
+import { buildKeyboard } from '../lib/callback_data.js';
+import { sendScene } from '../lib/telegram.js';
+import { chooseLocale, resolveLocalized } from '../lib/engine/i18n.js';
 
 export default async function (message, ctx) {
-  if (message.text !== '/start') return;
+  const text = message.text;
+  if (text !== '/start' && text !== '/reset' && text !== '/help') return;
+
   const userId = message.from.id;
+  const chatId = message.chat.id;
 
-  let playerRow = await db.select().from(sessions).where(eq(sessions.userId, userId)).get();
-  if (!playerRow) {
-    [playerRow] = await db.insert(sessions).values({ userId }).returning().run();
+  try {
+    if (text === '/help') {
+      const locale = chooseLocale(config, message.from.language_code);
+      await api.sendMessage({
+        chat_id: chatId,
+        text: resolveLocalized(config.strings.help, locale, config.defaultLocale),
+        parse_mode: 'Markdown',
+      });
+      return;
+    }
+
+    const existing = await loadSession(userId);
+    const locale = existing?.meta?.locale || chooseLocale(config, message.from.language_code);
+
+    const state = text === '/reset'
+      ? await resetSession(userId, locale)
+      : existing || await createSession(userId, locale);
+
+    if (!state) {
+      await api.sendMessage({
+        chat_id: chatId,
+        text: resolveLocalized(config.strings.genericError, locale, config.defaultLocale),
+      });
+      return;
+    }
+
+    const result = engine.processAction(state, { type: 'RENDER' });
+    await saveSession(userId, result.nextSession);
+
+    const keyboard = buildKeyboard(
+      result.nextSession.nav.locationId,
+      result.nextSession.nav.sceneId,
+      result.buttons,
+    );
+
+    const responseText = text === '/reset'
+      ? `${resolveLocalized(config.strings.resetPrefix, locale, config.defaultLocale)}\n\n━━━━━━━━━━━━━━\n\n${result.responseText}`
+      : result.responseText;
+
+    await sendScene(chatId, { ...result, responseText }, keyboard);
+  } catch (e) {
+    console.error(`[message] user ${userId}, text "${text}":`, e);
+    await api.sendMessage({
+      chat_id: chatId,
+      text: resolveLocalized(config.strings.genericError, config.defaultLocale, config.defaultLocale),
+    }).catch(() => {});
   }
-
-  const session = fillSession(playerRow);
-
-  const result = stateMachine.processPlayerAction(session, { type: 'RENDER_CURRENT' });
-
-  const keyboard = {
-    inline_keyboard: result.buttons.map((text, idx) => [
-      { text: text, callback_data: `click:${idx}` }
-    ])
-  };
-
-  await api.sendPhoto({
-    chat_id: message.chat.id,
-    photo: result.imageUrl,
-    caption: result.responseText,
-    parse_mode: 'Markdown',
-    reply_markup: keyboard
-  });
 }
