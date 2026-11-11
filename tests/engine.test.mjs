@@ -39,11 +39,14 @@ function click(state, transitionIndex) {
   });
 }
 
-test('гараж: три кнопки, чит-кнопки нет', () => {
-  const result = render(baseState());
+test('пролог ведёт в гараж, в гараже три кнопки и нет чит-кнопки', () => {
+  const prologue = render(baseState());
+  assert.equal(prologue.nextSession.nav.sceneId, 'prologue');
+  assert.equal(prologue.buttons.length, 1);
 
-  assert.deepEqual(result.buttons.map(button => button.transitionIndex), [0, 1, 2]);
-  assert.ok(!result.buttons.some(button => button.text.includes('ЧИТ')));
+  const garage = render(baseState({ nav: { locationId: 'new_detroit', sceneId: 'garage' } }));
+  assert.deepEqual(garage.buttons.map(button => button.transitionIndex), [0, 1, 2]);
+  assert.ok(!garage.buttons.some(button => button.text.includes('ЧИТ')));
 });
 
 test('кнопки сохраняют индексы исходного массива переходов', () => {
@@ -55,14 +58,14 @@ test('кнопки сохраняют индексы исходного масс
 
   assert.equal(result.buttons.length, 2);
   assert.equal(result.buttons[0].transitionIndex, 0);
-  assert.equal(result.buttons[1].transitionIndex, 1);
+  assert.equal(result.buttons[1].transitionIndex, 2);
 });
 
 test('ремонт скрыт при полном HP', () => {
   const state = baseState({ nav: { locationId: 'new_detroit', sceneId: 'market_repair' } });
   const result = render(state);
 
-  assert.deepEqual(result.buttons.map(button => button.transitionIndex), [1]);
+  assert.deepEqual(result.buttons.map(button => button.transitionIndex), [2]);
 });
 
 test('ремонт скрыт, если не хватает чипов', () => {
@@ -72,7 +75,7 @@ test('ремонт скрыт, если не хватает чипов', () => {
   });
   const result = render(state);
 
-  assert.deepEqual(result.buttons.map(button => button.transitionIndex), [1]);
+  assert.deepEqual(result.buttons.map(button => button.transitionIndex), [2]);
 });
 
 test('ремонт показывает цену и применяет эффекты', () => {
@@ -133,7 +136,7 @@ test('legacy-клик без location/scene не применяется', () => 
   const result = engine.processAction(state, { type: 'CLICK', transitionIndex: 0 });
 
   assert.equal(result.stale, true);
-  assert.equal(result.nextSession.nav.sceneId, 'garage');
+  assert.equal(result.nextSession.nav.sceneId, 'prologue');
 });
 
 test('смерть трака эвакуирует в мастерскую с 1 HP', () => {
@@ -247,26 +250,90 @@ test('бункер проходится один раз: после рейда �
   assert.notEqual(noRadio.nextSession.nav.locationId, 'event_radio');
 });
 
-test('доска объявлений: повторяемая работа даёт репутацию и упирается в лимит', () => {
-  const state = baseState({ nav: { locationId: 'new_detroit', sceneId: 'job_board' } });
-  const result = click(state, 0);
+test('доска объявлений: заказ берётся, отменяется и упирается в кулдаун', () => {
+  const FIXED_NOW = Date.UTC(2026, 0, 1);
+  const timedEngine = new GameEngine(config, registry, { now: () => FIXED_NOW });
 
-  assert.equal(result.nextSession.vars.repNeoTek, 6);
-  assert.equal(result.nextSession.resources.diesel, 30);
-  assert.equal(result.nextSession.nav.sceneId, 'job_board');
-
-  const capped = baseState({
-    nav: { locationId: 'new_detroit', sceneId: 'job_board' },
-    vars: { repNeoTek: 99 },
+  const board = baseState({ nav: { locationId: 'new_detroit', sceneId: 'job_board' } });
+  const taken = timedEngine.processAction(board, {
+    type: 'CLICK',
+    locationId: 'new_detroit',
+    sceneId: 'job_board',
+    transitionIndex: 0,
   });
-  assert.equal(click(capped, 0).nextSession.vars.repNeoTek, 100);
+
+  assert.equal(taken.nextSession.flags.side.active, 1);
+  assert.equal(taken.nextSession.flags.side.neo_tek_survey, 1);
+  assert.equal(taken.nextSession.vars.repNeoTek, 0);
+  assert.equal(taken.nextSession.nav.sceneId, 'job_board');
+
+  // Пока заказ активен, новые заказы не берутся, но есть отмена.
+  const activeButtons = render(taken.nextSession).buttons.map(button => button.transitionIndex);
+  assert.deepEqual(activeButtons, [3, 4, 5]);
+
+  const cancelled = timedEngine.processAction(taken.nextSession, {
+    type: 'CLICK',
+    locationId: 'new_detroit',
+    sceneId: 'job_board',
+    transitionIndex: 3,
+  });
+  assert.equal(cancelled.nextSession.flags.side.active, 0);
+  assert.equal(cancelled.nextSession.flags.side.neo_tek_survey, 0);
+
+  // Кулдаун скрывает все заказы до указанного времени.
+  const cooling = baseState({
+    nav: { locationId: 'new_detroit', sceneId: 'job_board' },
+    vars: { sideCooldownUntil: FIXED_NOW + 60 * 60 * 1000 },
+  });
+  const coolingButtons = timedEngine.processAction(cooling, { type: 'RENDER' })
+    .buttons.map(button => button.transitionIndex);
+  assert.deepEqual(coolingButtons, [4, 5]);
+
+  const ready = baseState({
+    nav: { locationId: 'new_detroit', sceneId: 'job_board' },
+    vars: { sideCooldownUntil: FIXED_NOW - 1 },
+  });
+  const readyButtons = timedEngine.processAction(ready, { type: 'RENDER' })
+    .buttons.map(button => button.transitionIndex);
+  assert.deepEqual(readyButtons, [0, 1, 2, 4, 5]);
+});
+
+test('побочный выезд ставит общий кулдаун и показывает таймер', () => {
+  const FIXED_NOW = Date.UTC(2026, 0, 1);
+  const timedEngine = new GameEngine(config, registry, { now: () => FIXED_NOW });
+
+  const state = baseState({
+    nav: { locationId: 'side_quests', sceneId: 'neo_tek_middle' },
+    flags: { side: { active: 1, neo_tek_survey: 1 } },
+  });
+
+  const result = timedEngine.processAction(state, {
+    type: 'CLICK',
+    locationId: 'side_quests',
+    sceneId: 'neo_tek_middle',
+    transitionIndex: 0,
+  });
+
+  assert.equal(result.nextSession.flags.side.active, 0);
+  assert.equal(result.nextSession.flags.side.neo_tek_survey, 0);
+  assert.equal(result.nextSession.vars.repNeoTek, 2);
+  assert.equal(
+    result.nextSession.vars.sideCooldownUntil,
+    FIXED_NOW + config.settings.sideQuestCooldownMs,
+  );
+
+  const board = timedEngine.processAction({
+    ...result.nextSession,
+    nav: { locationId: 'new_detroit', sceneId: 'job_board' },
+  }, { type: 'RENDER' });
+  assert.match(board.responseText, /Следующее задание через 24 ч/);
 });
 
 test('награда фракции выдаётся только на пороге репутации и один раз', () => {
   const nav = { locationId: 'new_detroit', sceneId: 'faction_rewards' };
 
   const locked = render(baseState({ nav }));
-  assert.deepEqual(locked.buttons.map(button => button.transitionIndex), [3]);
+  assert.deepEqual(locked.buttons.map(button => button.transitionIndex), [9]);
 
   const ready = baseState({ nav, vars: { repNeoTek: 30 } });
   const readyRender = render(ready);
@@ -302,6 +369,86 @@ test('модули фракций дают пассивные бонусы', () 
     inventory: { baron_plating: { qty: 1 } },
   });
   assert.equal(click(trip, 0).nextSession.resources.diesel, 28);
+});
+
+test('проценты брони и топлива считаются от максимумов', () => {
+  const state = baseState({
+    resources: { hp: 100, diesel: 25 },
+    vars: { maxHp: 250, maxDiesel: 50 },
+  });
+  const scope = createScope(state, config, 'ru');
+
+  assert.equal(scope.get('hp_percent'), 40);
+  assert.equal(scope.get('diesel_percent'), 50);
+});
+
+test('апгрейд ходовой повышает уровень и списывает чипы', () => {
+  const state = baseState({
+    nav: { locationId: 'new_detroit', sceneId: 'market_repair' },
+    resources: { chips: 500, hp: 250 },
+  });
+
+  const rendered = render(state);
+  assert.deepEqual(rendered.buttons.map(button => button.transitionIndex), [1, 2]);
+
+  const upgraded = click(state, 1);
+  assert.equal(upgraded.nextSession.vars.truckLevel, 2);
+  assert.equal(upgraded.nextSession.resources.chips, 100);
+});
+
+test('сюжетная доска: гейты репутации 0/15/30/45/60/75', () => {
+  const nav = { locationId: 'new_detroit', sceneId: 'story_board' };
+  const buttonsFor = (neo, rep) => render(baseState({
+    nav,
+    flags: { story: { neo_tek: neo } },
+    vars: { repNeoTek: rep },
+  })).buttons.map(button => button.transitionIndex);
+
+  assert.deepEqual(buttonsFor({}, 0), [0, 6, 7]);
+  assert.deepEqual(buttonsFor({ q1: 1 }, 14), [6, 7]);
+  assert.deepEqual(buttonsFor({ q1: 1 }, 15), [1, 6, 7]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1 }, 30), [2, 6, 7]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1 }, 44), [6, 7]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1 }, 45), [3, 6, 7]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1 }, 59), [6, 7]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1 }, 60), [4, 6, 7]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1, q5: 1 }, 74), [6, 7]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1, q5: 1 }, 75), [5, 6, 7]);
+});
+
+test('сюжетный квест даёт +15 своей фракции и −5 остальным', () => {
+  const state = baseState({
+    nav: { locationId: 'story_neo_tek', sceneId: 'q1_return' },
+    flags: { story: { neo_tek: { truth: 1 } } },
+    stats: { luck: 3 },
+  });
+
+  const result = click(state, 2);
+  assert.equal(result.nextSession.resources.chips, 350);
+  assert.equal(result.nextSession.vars.repNeoTek, 15);
+  assert.equal(result.nextSession.vars.repRustyBarons, 0);
+  assert.equal(result.nextSession.vars.repEclipse, 0);
+  assert.equal(result.nextSession.flags.story.neo_tek.q1, 1);
+});
+
+test('финал Нео-Тек открывает протоколы и ведёт в эпилог', () => {
+  const nav = { locationId: 'story_neo_tek', sceneId: 'q6_choice' };
+  const state = baseState({
+    nav,
+    vars: { repNeoTek: 75 },
+    flags: { story: { neo_tek: { deal_barons: 1, priest_alive: 1 } } },
+  });
+
+  const rendered = render(state);
+  assert.deepEqual(rendered.buttons.map(button => button.transitionIndex), [0, 1, 2, 3]);
+
+  const endless = click(state, 3);
+  assert.equal(endless.nextSession.nav.locationId, 'endings');
+  assert.equal(endless.nextSession.nav.sceneId, 'endless_road');
+  assert.equal(endless.nextSession.flags.story.neo_tek.q6, 1);
+
+  const dawn = click(state, 0);
+  assert.equal(dawn.nextSession.nav.sceneId, 'new_dawn');
 });
 
 test('условия с && работают', () => {

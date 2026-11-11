@@ -52,7 +52,8 @@ function localized(value, state, config) {
 
 // Scope — мост между выражениями и состоянием.
 // get(name) умеет и пути (resources.chips), и derived-значения (repair_cost_full).
-export function createScope(state, config, locale) {
+// now — источник времени для кулдаунов; в тестах его подменяют фиксированной датой.
+export function createScope(state, config, locale, now = Date.now) {
   const derivedCache = new Map();
   const resolving = new Set();
 
@@ -101,6 +102,8 @@ export function createScope(state, config, locale) {
           return Number(getValue(state, `inventory.${args[0]}.qty`)) || 0;
         case 'inventorySummary':
           return inventorySummary(state, config, locale);
+        case 'now':
+          return typeof now === 'function' ? now() : Number(now);
         default:
           throw new Error(`Неизвестная функция "${name}"`);
       }
@@ -247,10 +250,12 @@ export class GameEngine {
     this.config = config;
     this.registry = registry;
     this.random = options.random || Math.random;
+    const now = options.now ?? Date.now;
+    this.now = typeof now === 'function' ? now : () => now;
   }
 
   createScope(state) {
-    return createScope(state, this.config, localeOf(state, this.config));
+    return createScope(state, this.config, localeOf(state, this.config), this.now);
   }
 
   processAction(state, action = {}) {

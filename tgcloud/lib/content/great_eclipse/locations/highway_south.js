@@ -11,6 +11,8 @@ export const highwaySouth = {
         '⛽ **Приборная панель:**',
         '• Запас дизеля: `{resources.diesel}/{vars.maxDiesel} л.`',
         '',
+        '{side_quest_line}',
+        '',
         '📋 **Навигация:**',
         '• 🏁 Начать путь к Ржавым Выселкам: **15 км** (Расход: `{travel_fuel_cost}` л. ⛽)',
         '• ⬅️ Сдать назад и вернуться в Новый Детройт: **0 км** (Бесплатно ⛽)',
@@ -25,6 +27,12 @@ export const highwaySouth = {
             'vars.destination': 'rusty_outpost:garage',
           },
           target: '@router:highway',
+        },
+        {
+          buttonText: '🎯 Выполнить заказ (−{travel_fuel_cost * 2} л.)',
+          condition: 'flags.side.active && resources.diesel >= travel_fuel_cost * 2',
+          effects: { 'resources.diesel': '-travel_fuel_cost * 2' },
+          target: '@table:active_side_quest',
         },
         {
           buttonText: '⬅️ Вернуться в Новый Детройт',
@@ -42,6 +50,8 @@ export const highwaySouth = {
         '⛽ **Приборная панель:**',
         '• Запас дизеля: `{resources.diesel}/{vars.maxDiesel} л.`',
         '',
+        '{side_quest_line}',
+        '',
         '📋 **Навигация:**',
         '• 🏁 Начать путь к Новому Детройту: **15 км** (Расход: `{travel_fuel_cost}` л. ⛽)',
         '• ⬅️ Сдать назад и вернуться на Аванпост: **0 км** (Бесплатно ⛽)',
@@ -56,6 +66,12 @@ export const highwaySouth = {
             'vars.destination': 'new_detroit:garage',
           },
           target: '@router:highway',
+        },
+        {
+          buttonText: '🎯 Выполнить заказ (−{travel_fuel_cost * 2} л.)',
+          condition: 'flags.side.active && resources.diesel >= travel_fuel_cost * 2',
+          effects: { 'resources.diesel': '-travel_fuel_cost * 2' },
+          target: '@table:active_side_quest',
         },
         {
           buttonText: '⬅️ Вернуться в Ржавые Выселки',

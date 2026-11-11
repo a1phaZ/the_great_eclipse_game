@@ -6,6 +6,9 @@ import { eventAmbush } from './locations/event_ambush.js';
 import { eventLoot } from './locations/event_loot.js';
 import { eventRadio } from './locations/event_radio.js';
 import { eventBunker } from './locations/event_bunker.js';
+import { sideQuests } from './locations/side_quests.js';
+import { storyNeoTek } from './locations/story_neo_tek.js';
+import { endings } from './locations/endings.js';
 import { systemLocation } from './locations/system.js';
 
 // Контент-пак: один мир на одного бота.
@@ -20,6 +23,9 @@ export const pack = {
     eventLoot,
     eventRadio,
     eventBunker,
+    sideQuests,
+    storyNeoTek,
+    endings,
     systemLocation,
   ],
 };

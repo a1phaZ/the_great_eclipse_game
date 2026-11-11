@@ -21,7 +21,7 @@ const FUNCTION_RE = /^([A-Za-z_][A-Za-z0-9_]*)\s*\(/;
 
 const KNOWN_FUNCTIONS = new Set([
   'min', 'max', 'round', 'floor', 'ceil', 'abs', 'clamp',
-  'hasItem', 'itemQty', 'inventorySummary',
+  'hasItem', 'itemQty', 'inventorySummary', 'now',
 ]);
 
 const SPECIAL_EFFECTS = new Set(['MAX', 'MIN', 'CLEAR', 'TOGGLE']);
@@ -31,8 +31,11 @@ const MAX_CAPTION = 1024;
 const MAX_BUTTON_TEXT = 64;
 const MAX_CALLBACK_BYTES = 64;
 
+// Фиксированное время, чтобы валидатор был детерминированным.
+const SAMPLE_NOW = Date.UTC(2026, 0, 1);
+
 const SAMPLE_STATE = createState(config, config.defaultLocale);
-const SAMPLE_SCOPE = createScope(SAMPLE_STATE, config, config.defaultLocale);
+const SAMPLE_SCOPE = createScope(SAMPLE_STATE, config, config.defaultLocale, () => SAMPLE_NOW);
 
 function charLength(value) {
   return [...String(value)].length;
@@ -208,8 +211,39 @@ export function validateContent() {
     if (typeof faction.repVar !== 'string' || !config.vars?.[faction.repVar]) {
       addError(where, `repVar "${faction.repVar}" не объявлена в config.vars`);
     }
-    if (typeof faction.rewardItem !== 'string' || !config.items?.[faction.rewardItem]) {
+    if (faction.rewardItem !== undefined
+      && (typeof faction.rewardItem !== 'string' || !config.items?.[faction.rewardItem])) {
       addError(where, `rewardItem "${faction.rewardItem}" отсутствует в config.items`);
+    }
+
+    if (!Array.isArray(faction.ranks) || faction.ranks.length === 0) {
+      addError(where, 'нет ranks — нечего выдавать за репутацию');
+      continue;
+    }
+    faction.ranks.forEach((rank, index) => {
+      const rankWhere = `${where}.ranks[${index}]`;
+      if (!isPlainObject(rank)) {
+        addError(rankWhere, 'ранг должен быть объектом');
+        return;
+      }
+      if (typeof rank.rep !== 'number' || rank.rep < 0) {
+        addError(rankWhere, 'rep должен быть неотрицательным числом');
+      }
+      if (!rank.title) addError(rankWhere, 'нет title');
+      if (typeof rank.item !== 'string' || !config.items?.[rank.item]) {
+        addError(rankWhere, `item "${rank.item}" отсутствует в config.items`);
+      }
+    });
+  }
+
+  if (config.settings !== undefined) {
+    if (!isPlainObject(config.settings)) {
+      addError(configWhere, 'settings должен быть объектом');
+    } else if (config.settings.sideQuestCooldownMs !== undefined) {
+      const cooldown = config.settings.sideQuestCooldownMs;
+      if (typeof cooldown !== 'number' || !Number.isFinite(cooldown) || cooldown <= 0) {
+        addError(configWhere, 'settings.sideQuestCooldownMs должен быть положительным числом');
+      }
     }
   }
 
