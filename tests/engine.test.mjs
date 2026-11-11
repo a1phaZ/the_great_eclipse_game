@@ -451,6 +451,42 @@ test('финал Нео-Тек открывает протоколы и ведё
   assert.equal(dawn.nextSession.nav.sceneId, 'new_dawn');
 });
 
+test('сюжетные выборы ведут в сцены-результаты с одним переходом дальше', () => {
+  const location = registry.getLocation('story_neo_tek');
+  const sourceScenes = [
+    'q1_start', 'q1_bluff_fail', 'q1_road', 'q1_orion', 'q1_return',
+    'q2_start', 'q2_road', 'q2_polygon', 'q2_finish',
+    'q3_start', 'q3_chase', 'q3_roadside', 'q3_return',
+    'q4_start', 'q4_perimeter', 'q4_vault', 'q4_exit',
+    'q5_start', 'q5_assault', 'q5_code', 'q5_voice',
+    'q6_start', 'q6_roof',
+  ];
+
+  for (const sceneId of sourceScenes) {
+    const scene = registry.getScene('story_neo_tek', sceneId);
+    for (const transition of scene.transitions) {
+      if (!transition.target.startsWith('story_neo_tek:')) continue;
+      const targetId = transition.target.split(':')[1];
+      assert.match(
+        targetId,
+        /_res_|^q1_bluff_fail$/,
+        `${sceneId} должен вести в сцену-результат, а не сразу в ${targetId}`,
+      );
+    }
+  }
+
+  const resultIds = Object.keys(location.scenes).filter(sceneId => sceneId.includes('_res_'));
+  assert.ok(resultIds.length > 0);
+  for (const sceneId of resultIds) {
+    const scene = location.scenes[sceneId];
+    assert.equal(scene.transitions.length, 1, `${sceneId} должен иметь один переход «Дальше»`);
+    assert.ok(
+      !scene.transitions[0].target.split(':')[1].includes('_res_'),
+      `${sceneId} не должен вести в другую сцену-результат`,
+    );
+  }
+});
+
 test('условия с && работают', () => {
   const full = createScope(baseState(), config, 'ru');
   assert.equal(
