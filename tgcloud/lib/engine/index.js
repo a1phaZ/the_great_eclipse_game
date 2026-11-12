@@ -1,8 +1,15 @@
 import { evaluateExpression, toNumber, truthy } from './expression.js';
 import { resolveLocalized } from './i18n.js';
 import {
+  DEFAULT_LOCALE,
+  TARGET_PREFIXES,
+  isPlainObject,
+  normalizeConfig,
+} from './contract.js';
+import {
   applyEffect,
   cloneState,
+  createState,
   formatSceneKey,
   getValue,
   inventorySummary,
@@ -38,20 +45,67 @@ export class WorldRegistry {
   }
 }
 
-function isPlainObject(value) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
-
 function localeOf(state, config) {
-  return state?.meta?.locale || config.defaultLocale || 'ru';
+  return state?.meta?.locale || config.defaultLocale || DEFAULT_LOCALE;
 }
 
 function localized(value, state, config) {
   return resolveLocalized(value, localeOf(state, config), config.defaultLocale);
 }
 
+// Встроенные функции выражений. Единый источник для движка и валидатора:
+// валидатор строит список известных функций из ключей этого объекта.
+export const BUILTIN_FUNCTIONS = Object.freeze({
+  min: {
+    minArgs: 1,
+    maxArgs: Infinity,
+    call: (args) => Math.min(...args.map(toNumber)),
+  },
+  max: {
+    minArgs: 1,
+    maxArgs: Infinity,
+    call: (args) => Math.max(...args.map(toNumber)),
+  },
+  round: { minArgs: 1, maxArgs: 1, call: (args) => Math.round(toNumber(args[0])) },
+  floor: { minArgs: 1, maxArgs: 1, call: (args) => Math.floor(toNumber(args[0])) },
+  ceil: { minArgs: 1, maxArgs: 1, call: (args) => Math.ceil(toNumber(args[0])) },
+  abs: { minArgs: 1, maxArgs: 1, call: (args) => Math.abs(toNumber(args[0])) },
+  clamp: {
+    minArgs: 3,
+    maxArgs: 3,
+    call: (args) => {
+      const value = toNumber(args[0]);
+      const min = toNumber(args[1]);
+      const max = toNumber(args[2]);
+      return Math.min(Math.max(value, min), max);
+    },
+  },
+  hasItem: {
+    minArgs: 1,
+    maxArgs: 1,
+    call: (args, { state, config }) =>
+      (Number(getValue(state, `inventory.${args[0]}.qty`, config)) || 0) > 0,
+  },
+  itemQty: {
+    minArgs: 1,
+    maxArgs: 1,
+    call: (args, { state, config }) =>
+      Number(getValue(state, `inventory.${args[0]}.qty`, config)) || 0,
+  },
+  inventorySummary: {
+    minArgs: 0,
+    maxArgs: 0,
+    call: (args, { state, config, locale }) => inventorySummary(state, config, locale),
+  },
+  now: {
+    minArgs: 0,
+    maxArgs: 0,
+    call: (args, { now }) => (typeof now === 'function' ? now() : Number(now)),
+  },
+});
+
 // Scope — мост между выражениями и состоянием.
-// get(name) умеет и пути (resources.chips), и derived-значения (repair_cost_full).
+// get(name) умеет и пути (resources.gold), и derived-значения (derived_name).
 // now — источник времени для кулдаунов; в тестах его подменяют фиксированной датой.
 export function createScope(state, config, locale, now = Date.now) {
   const derivedCache = new Map();
@@ -79,34 +133,15 @@ export function createScope(state, config, locale, now = Date.now) {
         }
       }
 
-      return getValue(state, name);
+      return getValue(state, name, config);
     },
 
     call(name, args) {
-      switch (name) {
-        case 'min': return Math.min(...args.map(toNumber));
-        case 'max': return Math.max(...args.map(toNumber));
-        case 'round': return Math.round(toNumber(args[0]));
-        case 'floor': return Math.floor(toNumber(args[0]));
-        case 'ceil': return Math.ceil(toNumber(args[0]));
-        case 'abs': return Math.abs(toNumber(args[0]));
-        case 'clamp': {
-          const value = toNumber(args[0]);
-          const min = toNumber(args[1]);
-          const max = toNumber(args[2]);
-          return Math.min(Math.max(value, min), max);
-        }
-        case 'hasItem':
-          return (Number(getValue(state, `inventory.${args[0]}.qty`)) || 0) > 0;
-        case 'itemQty':
-          return Number(getValue(state, `inventory.${args[0]}.qty`)) || 0;
-        case 'inventorySummary':
-          return inventorySummary(state, config, locale);
-        case 'now':
-          return typeof now === 'function' ? now() : Number(now);
-        default:
-          throw new Error(`Неизвестная функция "${name}"`);
+      const builtin = BUILTIN_FUNCTIONS[name];
+      if (!builtin) {
+        throw new Error(`Неизвестная функция "${name}"`);
       }
+      return builtin.call(args, { state, config, locale, now, scope });
     },
   };
 
@@ -210,7 +245,7 @@ export function resolveRouter(name, state, config, scope, random, depth = 0) {
       return resolveTable(router.table, state, config, scope, random, depth + 1);
 
     case 'var': {
-      const value = getValue(state, router.path);
+      const value = getValue(state, router.path, config);
       if (typeof value === 'string' && value.includes(':')) return value.trim();
       return router.fallback ?? null;
     }
@@ -231,14 +266,14 @@ export function resolveTarget(target, state, config, scope, random = Math.random
   const value = target.trim();
   if (value === '') return null;
 
-  if (value.startsWith('@router:')) {
-    return resolveRouter(value.slice('@router:'.length), state, config, scope, random, depth + 1);
+  if (value.startsWith(TARGET_PREFIXES.router)) {
+    return resolveRouter(value.slice(TARGET_PREFIXES.router.length), state, config, scope, random, depth + 1);
   }
-  if (value.startsWith('@table:')) {
-    return resolveTable(value.slice('@table:'.length), state, config, scope, random, depth + 1);
+  if (value.startsWith(TARGET_PREFIXES.table)) {
+    return resolveTable(value.slice(TARGET_PREFIXES.table.length), state, config, scope, random, depth + 1);
   }
-  if (value.startsWith('@var:')) {
-    const resolved = getValue(state, value.slice('@var:'.length));
+  if (value.startsWith(TARGET_PREFIXES.var)) {
+    const resolved = getValue(state, value.slice(TARGET_PREFIXES.var.length), config);
     return typeof resolved === 'string' && resolved.trim() !== '' ? resolved.trim() : null;
   }
 
@@ -247,7 +282,7 @@ export function resolveTarget(target, state, config, scope, random = Math.random
 
 export class GameEngine {
   constructor(config, registry, options = {}) {
-    this.config = config;
+    this.config = normalizeConfig(config);
     this.registry = registry;
     this.random = options.random || Math.random;
     const now = options.now ?? Date.now;
@@ -392,18 +427,7 @@ export class GameEngine {
   }
 
   createEmptyState() {
-    return {
-      nav: parseSceneKey(this.config.start),
-      resources: {},
-      stats: {},
-      vars: {},
-      flags: {},
-      inventory: {},
-      meta: {
-        version: this.config.version ?? 1,
-        locale: this.config.defaultLocale || 'ru',
-      },
-    };
+    return createState(this.config);
   }
 
   render(state) {

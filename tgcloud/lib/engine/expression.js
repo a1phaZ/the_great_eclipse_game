@@ -2,7 +2,7 @@
 //
 // Поддерживает:
 //   числа, строки, true/false/null;
-//   пути состояния: resources.chips, flags.quest.noise, inventory.ammo.qty;
+//   пути состояния: resources.gold, flags.quest.noise, inventory.ammo.qty;
 //   + - * / %, сравнения, && || !, тернарник ? :, скобки;
 //   функции: min, max, round, floor, ceil, abs, clamp.
 //

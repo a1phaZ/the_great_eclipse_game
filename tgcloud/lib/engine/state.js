@@ -1,5 +1,14 @@
 import { evaluateExpression, toNumber, truthy } from './expression.js';
 import { chooseLocale, resolveLocalized } from './i18n.js';
+import {
+  CORE_NAMESPACES,
+  DEFAULT_LOCALE,
+  DEFAULT_VERSION,
+  NUMERIC_NAMESPACES,
+  customNamespaces,
+  getCustomNamespace,
+  isPlainObject,
+} from './contract.js';
 
 // Работа с универсальным JSON-состоянием.
 //
@@ -11,10 +20,6 @@ import { chooseLocale, resolveLocalized } from './i18n.js';
 //   flags      — квестовые/сюжетные флаги
 //   inventory  — предметы: { itemId: { qty, ...fields } }
 //   meta       — версия и язык
-
-function isPlainObject(value) {
-  return value !== null && typeof value === 'object' && !Array.isArray(value);
-}
 
 export function parseSceneKey(key) {
   if (typeof key !== 'string' || !key.includes(':')) {
@@ -32,6 +37,11 @@ export function cloneState(state) {
   return JSON.parse(JSON.stringify(state ?? {}));
 }
 
+function cloneInitial(value, fallback) {
+  if (value === undefined) return fallback;
+  return JSON.parse(JSON.stringify(value));
+}
+
 export function createState(config, locale) {
   const state = {
     nav: parseSceneKey(config.start),
@@ -41,7 +51,7 @@ export function createState(config, locale) {
     flags: {},
     inventory: {},
     meta: {
-      version: config.version ?? 1,
+      version: config.version ?? DEFAULT_VERSION,
       locale: chooseLocale(config, locale),
     },
   };
@@ -55,6 +65,9 @@ export function createState(config, locale) {
   for (const [id, definition] of Object.entries(config.vars || {})) {
     state.vars[id] = definition.initial ?? (definition.type === 'string' ? '' : 0);
   }
+  for (const [namespace, definition] of Object.entries(customNamespaces(config))) {
+    state[namespace] = cloneInitial(definition?.initial, {});
+  }
 
   return state;
 }
@@ -66,12 +79,19 @@ export function mergeDefaults(config, savedState) {
     ? state.nav
     : parseSceneKey(config.start);
 
-  for (const namespace of ['resources', 'stats', 'vars', 'flags', 'inventory']) {
+  for (const namespace of CORE_NAMESPACES) {
+    if (namespace === 'nav' || namespace === 'meta') continue;
     if (!isPlainObject(state[namespace])) state[namespace] = {};
   }
 
+  for (const [namespace, definition] of Object.entries(customNamespaces(config))) {
+    if (state[namespace] === undefined) {
+      state[namespace] = cloneInitial(definition?.initial, {});
+    }
+  }
+
   state.meta = isPlainObject(state.meta) ? state.meta : {};
-  state.meta.version = state.meta.version ?? config.version ?? 1;
+  state.meta.version = state.meta.version ?? config.version ?? DEFAULT_VERSION;
   state.meta.locale = chooseLocale(config, state.meta.locale);
 
   for (const [id, definition] of Object.entries(config.resources || {})) {
@@ -133,15 +153,21 @@ export function deletePath(object, path) {
 }
 
 // Значение по пути с безопасными дефолтами для отсутствующих полей.
-export function getValue(state, path) {
+// config нужен только для значений по умолчанию кастомных namespace.
+export function getValue(state, path, config) {
   const value = getPath(state, path);
   if (value !== undefined) return value;
 
-  if (path.startsWith('flags.')) return 0;
-  if (path.startsWith('inventory.') && path.endsWith('.qty')) return 0;
-  if (path.startsWith('resources.') || path.startsWith('stats.') || path.startsWith('vars.')) {
-    return 0;
-  }
+  const namespace = String(path).split('.')[0];
+  const hasField = String(path).includes('.');
+
+  if (hasField && namespace === 'flags') return 0;
+  if (namespace === 'inventory' && path.endsWith('.qty')) return 0;
+  if (hasField && NUMERIC_NAMESPACES.includes(namespace)) return 0;
+
+  const custom = getCustomNamespace(config, namespace);
+  if (custom && custom.default !== undefined) return custom.default;
+
   return undefined;
 }
 
@@ -169,6 +195,12 @@ function findDefinition(config, path) {
     if (!item) return undefined;
     if (!field || field === 'qty') return { min: 0, max: item.maxQty };
     return item.fields?.[field];
+  }
+
+  const custom = getCustomNamespace(config, namespace);
+  if (custom) {
+    if (!field) return custom;
+    return custom.fields?.[field];
   }
 
   return undefined;
@@ -232,7 +264,7 @@ function getMin(state, config, path) {
 //   "N" / выражение — установить
 //
 // Если выражение не разбирается, значение считается строковым литералом
-// (удобно для vars.destination = "rusty_outpost:garage").
+// (удобно для vars.target = "location:scene").
 export function applyEffect(state, config, path, rawValue, scope) {
   const raw = String(rawValue ?? '').trim();
   if (raw === '') return state;
@@ -245,7 +277,7 @@ export function applyEffect(state, config, path, rawValue, scope) {
   }
 
   if (raw === 'TOGGLE') {
-    setPath(state, path, truthy(getValue(state, path)) ? 0 : 1);
+    setPath(state, path, truthy(getValue(state, path, config)) ? 0 : 1);
     return state;
   }
 
@@ -287,7 +319,7 @@ export function applyEffect(state, config, path, rawValue, scope) {
   }
 
   if (operation === 'add' || operation === 'sub') {
-    const current = toNumber(getValue(state, path));
+    const current = toNumber(getValue(state, path, config));
     const amount = toNumber(value);
     if (Number.isNaN(current) || Number.isNaN(amount)) return state;
     const next = operation === 'add' ? current + amount : current - amount;
@@ -301,12 +333,12 @@ export function applyEffect(state, config, path, rawValue, scope) {
 
 // Текстовая сводка инвентаря для сцен: {inventorySummary()}.
 export function inventorySummary(state, config, locale) {
-  const defaultLocale = config.defaultLocale || 'ru';
+  const defaultLocale = config.defaultLocale || DEFAULT_LOCALE;
   const items = config.items || {};
   const lines = [];
 
   for (const [id, item] of Object.entries(items)) {
-    const quantity = Number(getValue(state, `inventory.${id}.qty`) || 0);
+    const quantity = Number(getValue(state, `inventory.${id}.qty`, config) || 0);
     if (!quantity) continue;
 
     const name = resolveLocalized(item.name, locale, defaultLocale);
@@ -314,7 +346,7 @@ export function inventorySummary(state, config, locale) {
 
     const extras = [];
     for (const [field, definition] of Object.entries(item.fields || {})) {
-      const value = Number(getValue(state, `inventory.${id}.${field}`));
+      const value = Number(getValue(state, `inventory.${id}.${field}`, config));
       if (!Number.isFinite(value)) continue;
       const label = resolveLocalized(definition.label || field, locale, defaultLocale);
       const max = resolveLimit(definition.max, state, config);

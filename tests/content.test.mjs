@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { validateContent } from '../scripts/validate-content.mjs';
+import { validateActiveContent } from '../scripts/validate-content.mjs';
 
 test('контент проходит валидацию без ошибок', () => {
-  const { errors, warnings, stats } = validateContent();
+  const { errors, warnings, stats } = validateActiveContent();
 
   assert.deepEqual(errors, []);
   assert.equal(warnings.length, 0);

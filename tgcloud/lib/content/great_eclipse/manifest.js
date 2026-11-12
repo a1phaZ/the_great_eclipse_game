@@ -1,4 +1,5 @@
 import { config } from './config.js';
+import { checks } from './validate.js';
 import { newDetroit } from './locations/new_detroit.js';
 import { highwaySouth } from './locations/highway_south.js';
 import { rustyOutpost } from './locations/rusty_outpost.js';
@@ -28,4 +29,8 @@ export const pack = {
     endings,
     systemLocation,
   ],
+  checks,
+  validation: {
+    requiredStrings: ['help'],
+  },
 };

@@ -10,6 +10,7 @@
     "status": "tgcloud status",
     "run": "tgcloud run",
     "test": "node --test \"tests/**/*.test.mjs\"",
+    "test:engine": "node --test tests/architecture.test.mjs tests/expression.test.mjs tests/state.test.mjs tests/engine-runtime.test.mjs tests/world.test.mjs tests/validator.test.mjs",
     "validate": "node scripts/validate-content.mjs"
   }
 }

@@ -156,23 +156,39 @@ The platform manages the bot's webhook for you, derived from your deployed
 ## Tests & content validation
 
 ```bash
-npm test          # node:test: expression, state, engine, callback_data, content
-npm run validate  # content validator: targets, conditions, effects, limits
+npm test             # all node:test suites
+npm run test:engine  # engine-only suite on a fixture pack, no active content
+npm run validate     # active pack validator: targets, conditions, effects, limits
 ```
 
-Tests import only pure modules (`lib/engine/`, `lib/content/`, `lib/world.js`,
-`lib/callback_data.js`); handlers/`telegram.js`/`persistence.js` import `sdk`
-and can't run locally. The validator uses the real `registry`, so it can't drift
-from the engine.
+Engine tests use `tests/fixtures/engine-pack.js` and import only `lib/engine/*`.
+`tests/architecture.test.mjs` guards that `lib/engine/` never imports `sdk`,
+content packs or the app. Content-specific tests live in
+`tests/content-great-eclipse.test.mjs`. Handlers, `lib/telegram/` and
+`lib/persistence.js` import `sdk` and can't run locally.
+
+The validator lives in `scripts/lib/content-validator.mjs` (dev-only) and takes a
+pack argument: `validateContent(pack, options)`. `scripts/validate-content.mjs`
+is the CLI wrapper for the active pack. Pack-specific checks go in
+`tgcloud/lib/content/<id>/validate.js` and are passed as `pack.checks`.
 
 ## Game engine & content packs
 
 The game is a universal scene engine in `tgcloud/lib/engine/` plus one active
 content pack in `tgcloud/lib/content/`. `tgcloud/lib/content/index.js` selects
-the pack; `tgcloud/lib/world.js` builds the registry and engine.
+the pack; `tgcloud/lib/world.js` builds the active world via `createWorld(pack)`.
 
+- `engine/contract.js` — state namespaces, effect keywords, target prefixes,
+  config defaults (`normalizeConfig`).
+- `engine/create-world.js` — `createWorld(pack, options)` and `createRegistry`.
+- `engine/` must stay free of `sdk` and content imports; the architecture test
+  enforces this.
+- `lib/telegram/` — reusable Telegram adapter: `createSessionStore(world)`,
+  `createMessageHandler(world)`, `createCallbackHandler(world)`.
+- `handlers/*.js` — thin wrappers around those factories.
 - `config.js` — resources, stats, vars, derived formulas, tables, routers,
-  death/recovery rules, strings, items, factions, locales.
+  death/recovery rules, strings, items, factions, locales, and optional
+  `navigationVars` (variables that hold a `location:scene` target).
 - `locations/*.js` — scenes with `text`, `imageUrl`, `transitions`
   (`buttonText`, `condition`, `effects`, `target`).
 - State is JSON: `nav`, `resources`, `stats`, `vars`, `flags`, `inventory`, `meta`.
@@ -181,5 +197,8 @@ the pack; `tgcloud/lib/world.js` builds the registry and engine.
 - Text placeholders: `{resources.chips}`, `{repair_cost_full}`,
   `{inventorySummary()}`.
 - Faction reputation lives in `vars` (`repNeoTek`, …); each entry in
-  `config.factions` names its `repVar` and `rewardItem`.
+  `config.factions` names its `repVar` and `rewardItem`. Factions and
+  `config.settings` are content-level features checked by `pack.checks`, not by
+  the engine.
+- Full pack contract and the "new pack" checklist: `docs/engine-contract.md`.
 

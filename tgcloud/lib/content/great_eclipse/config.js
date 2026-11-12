@@ -13,6 +13,10 @@ export const config = {
 
   start: 'new_detroit:prologue',
 
+  // Переменные, в которых контент хранит target-сцену. Валидатор проверяет
+  // их существование и достижимость; движок резолвит их через @var:.
+  navigationVars: ['vars.destination'],
+
   // Настройки пака. Кулдаун побочных выездов можно менять без правки сцен:
   // 24 часа = 86400000, 12 часов = 43200000.
   settings: {
@@ -63,7 +67,7 @@ export const config = {
   },
 
   vars: {
-    destination: { initial: '' },
+    destination: { initial: '', type: 'string' },
     truckModel: { initial: 'Мародер-Скаут' },
     truckLevel: { initial: 1, min: 1, max: 5 },
     truckBaseCost: { initial: 500, min: 0 },

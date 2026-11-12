@@ -1,13 +1,10 @@
-import { GameEngine, WorldRegistry } from './engine/index.js';
+import { createWorld } from './engine/create-world.js';
 import { pack } from './content/index.js';
 
-// Единый реестр мира собирается из активного контент-пака.
-// Раньше локации импортировались вручную в двух местах, из-за чего event_loot
-// был забыт в callback-обработчике. Теперь реестр один для всех точек входа.
-export const registry = new WorldRegistry();
-for (const location of pack.locations) {
-  registry.registerLocation(location.locationId, location);
-}
+// Активный мир приложения. Собирается из выбранного контент-пака.
+// Для другого пака достаточно поменять `content/index.js`.
+export const world = createWorld(pack);
 
-export const config = pack.config;
-export const engine = new GameEngine(config, registry);
+// Совместимость со старыми точками входа: обработчики и тесты импортируют
+// config/registry/engine напрямую. Новый код может использовать `world`.
+export const { config, registry, engine } = world;
