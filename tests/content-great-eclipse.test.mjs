@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { config, engine, registry } from '../tgcloud/lib/world.js';
+import { world } from '../tgcloud/lib/world.js';
 import { createState, applyEffect } from '../tgcloud/lib/engine/state.js';
 import {
   createScope,
@@ -9,6 +9,10 @@ import {
   GameEngine,
   WorldRegistry,
 } from '../tgcloud/lib/engine/index.js';
+
+// Контент-тесты работают с активным миром через его публичный объект.
+// Сам движок проверяется отдельно на фикстурном паке.
+const { config, engine, registry } = world;
 
 function baseState(overrides = {}) {
   const state = createState(config, 'ru');
