@@ -123,6 +123,8 @@ export const config = {
     neo_tek_truth_line: `flags.story.neo_tek.truth ? 'Вы знаете: «Завеса» — рукотворный проект инженеров.' : 'Вы пока не знаете всей правды о Затмении.'`,
     helios_signal_text: `vars.heliosSignal >= 2 ? 'Полный' : (vars.heliosSignal >= 1 ? 'Искажённый' : 'Нет связи')`,
     neo_tek_quest_hint: `flags.story.neo_tek.q6 ? 'Цепочка завершена.' : (flags.story.neo_tek.q5 ? 'Доступен финал: «Выбор Прометея» (нужно 75 репутации).' : 'Следующий сюжетный квест открывается по репутации.')`,
+    barons_quest_hint: `flags.story.barons.q6 ? 'Цепочка завершена.' : (flags.story.barons.q5 ? 'Доступен финал: «Железный марш» (нужно 75 репутации).' : 'Следующий сюжетный квест открывается по репутации.')`,
+    eclipse_quest_hint: `flags.story.eclipse.q6 ? 'Цепочка завершена.' : (flags.story.eclipse.q5 ? 'Доступен финал: «Последнее затмение» (нужно 75 репутации).' : 'Следующий сюжетный квест открывается по репутации.')`,
 
     // Звания для витрины фракций.
     neo_tek_rank: `vars.repNeoTek >= 75 ? 'Хранитель Орбиты' : (vars.repNeoTek >= 50 ? 'Старший оператор' : (vars.repNeoTek >= 25 ? 'Оператор' : 'Без звания'))`,

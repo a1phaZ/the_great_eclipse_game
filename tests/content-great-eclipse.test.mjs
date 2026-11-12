@@ -400,24 +400,72 @@ test('апгрейд ходовой повышает уровень и спис�
   assert.equal(upgraded.nextSession.resources.chips, 100);
 });
 
-test('сюжетная доска: гейты репутации 0/15/30/45/60/75', () => {
+test('сюжетная доска: гейты репутации Нео-Тека 0/15/30/45/60/75', () => {
   const nav = { locationId: 'new_detroit', sceneId: 'story_board' };
   const buttonsFor = (neo, rep) => render(baseState({
     nav,
     flags: { story: { neo_tek: neo } },
     vars: { repNeoTek: rep },
-  })).buttons.map(button => button.transitionIndex);
+  })).buttons
+    .filter(button => button.text.startsWith('🛰'))
+    .map(button => button.transitionIndex);
 
-  assert.deepEqual(buttonsFor({}, 0), [0, 6, 7]);
-  assert.deepEqual(buttonsFor({ q1: 1 }, 14), [6, 7]);
-  assert.deepEqual(buttonsFor({ q1: 1 }, 15), [1, 6, 7]);
-  assert.deepEqual(buttonsFor({ q1: 1, q2: 1 }, 30), [2, 6, 7]);
-  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1 }, 44), [6, 7]);
-  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1 }, 45), [3, 6, 7]);
-  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1 }, 59), [6, 7]);
-  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1 }, 60), [4, 6, 7]);
-  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1, q5: 1 }, 74), [6, 7]);
-  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1, q5: 1 }, 75), [5, 6, 7]);
+  assert.deepEqual(buttonsFor({}, 0), [0]);
+  assert.deepEqual(buttonsFor({ q1: 1 }, 14), []);
+  assert.deepEqual(buttonsFor({ q1: 1 }, 15), [1]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1 }, 30), [2]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1 }, 44), []);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1 }, 45), [3]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1 }, 59), []);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1 }, 60), [4]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1, q5: 1 }, 74), []);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1, q5: 1 }, 75), [5]);
+});
+
+test('сюжетная доска: гейты репутации Детей Затмения 0/15/30/45/60/75', () => {
+  const nav = { locationId: 'new_detroit', sceneId: 'story_board' };
+  const buttonsFor = (eclipse, rep) => render(baseState({
+    nav,
+    flags: { story: { eclipse } },
+    vars: { repEclipse: rep },
+  })).buttons
+    .filter(button => button.text.startsWith('🌑'))
+    .map(button => button.transitionIndex);
+
+  assert.deepEqual(buttonsFor({}, 0), [12]);
+  assert.deepEqual(buttonsFor({ q1: 1 }, 14), []);
+  assert.deepEqual(buttonsFor({ q1: 1 }, 15), [13]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1 }, 29), []);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1 }, 30), [14]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1 }, 44), []);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1 }, 45), [15]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1 }, 59), []);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1 }, 60), [16]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1, q5: 1 }, 74), []);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1, q5: 1 }, 75), [17]);
+});
+
+test('сюжетная доска: гейты репутации Ржавых Баронов 0/15/30/45/60/75', () => {
+  const nav = { locationId: 'new_detroit', sceneId: 'story_board' };
+  const buttonsFor = (barons, rep) => render(baseState({
+    nav,
+    flags: { story: { barons } },
+    vars: { repRustyBarons: rep },
+  })).buttons
+    .filter(button => button.text.startsWith('⛓'))
+    .map(button => button.transitionIndex);
+
+  assert.deepEqual(buttonsFor({}, 0), [6]);
+  assert.deepEqual(buttonsFor({ q1: 1 }, 14), []);
+  assert.deepEqual(buttonsFor({ q1: 1 }, 15), [7]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1 }, 29), []);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1 }, 30), [8]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1 }, 44), []);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1 }, 45), [9]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1 }, 59), []);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1 }, 60), [10]);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1, q5: 1 }, 74), []);
+  assert.deepEqual(buttonsFor({ q1: 1, q2: 1, q3: 1, q4: 1, q5: 1 }, 75), [11]);
 });
 
 test('сюжетный квест даёт +15 своей фракции и −5 остальным', () => {
@@ -474,6 +522,167 @@ test('сюжетные выборы ведут в сцены-результат�
       assert.match(
         targetId,
         /_res_|^q1_bluff_fail$/,
+        `${sceneId} должен вести в сцену-результат, а не сразу в ${targetId}`,
+      );
+    }
+  }
+
+  const resultIds = Object.keys(location.scenes).filter(sceneId => sceneId.includes('_res_'));
+  assert.ok(resultIds.length > 0);
+  for (const sceneId of resultIds) {
+    const scene = location.scenes[sceneId];
+    assert.equal(scene.transitions.length, 1, `${sceneId} должен иметь один переход «Дальше»`);
+    assert.ok(
+      !scene.transitions[0].target.split(':')[1].includes('_res_'),
+      `${sceneId} не должен вести в другую сцену-результат`,
+    );
+  }
+});
+
+test('сюжетный квест Затмения даёт +15 своей фракции и −5 остальным', () => {
+  const state = baseState({
+    nav: { locationId: 'story_eclipse', sceneId: 'q1_finish' },
+    flags: { story: { eclipse: { knows_ash: 1 } } },
+    stats: { luck: 6 },
+  });
+
+  const result = click(state, 0);
+  assert.equal(result.nextSession.resources.chips, 420);
+  assert.equal(result.nextSession.vars.repEclipse, 15);
+  assert.equal(result.nextSession.vars.repNeoTek, 0);
+  assert.equal(result.nextSession.vars.repRustyBarons, 0);
+  assert.equal(result.nextSession.flags.story.eclipse.q1, 1);
+});
+
+test('финал Затмения открывает эпилоги по флагам ветки', () => {
+  const nav = { locationId: 'story_eclipse', sceneId: 'q6_choice' };
+
+  const peaceful = baseState({
+    nav,
+    flags: { story: { eclipse: { knows_origins: 1 } } },
+    stats: { evasion: 30 },
+  });
+  const peacefulButtons = render(peaceful).buttons.map(button => button.transitionIndex);
+  assert.deepEqual(peacefulButtons, [0, 2, 3]);
+
+  const eternal = click(peaceful, 0);
+  assert.equal(eternal.nextSession.nav.locationId, 'story_eclipse');
+  assert.equal(eternal.nextSession.nav.sceneId, 'q6_res_eternal_night');
+  assert.equal(eternal.nextSession.flags.story.eclipse.q6, 1);
+
+  const road = click(peaceful, 3);
+  assert.equal(road.nextSession.nav.sceneId, 'q6_res_road');
+
+  const sabotaged = baseState({
+    nav,
+    flags: { story: { eclipse: { transmitter_sabotaged: 1, knows_origins: 1 } } },
+    stats: { evasion: 30 },
+  });
+  const sabotagedButtons = render(sabotaged).buttons.map(button => button.transitionIndex);
+  assert.deepEqual(sabotagedButtons, [1, 2, 3]);
+
+  const surgical = click(sabotaged, 1);
+  assert.equal(surgical.nextSession.nav.sceneId, 'q6_res_surgical');
+
+  const gods = click(sabotaged, 2);
+  assert.equal(gods.nextSession.nav.sceneId, 'q6_res_protocol_power');
+
+  assert.equal(
+    registry.getScene('story_eclipse', 'q6_res_eternal_night').transitions[0].target,
+    'endings:eclipse_eternal_night',
+  );
+  assert.equal(
+    registry.getScene('story_eclipse', 'q6_res_surgical').transitions[0].target,
+    'endings:eclipse_dawn',
+  );
+  assert.equal(
+    registry.getScene('story_eclipse', 'q6_res_protocol_power').transitions[0].target,
+    'endings:sector_zero_gods',
+  );
+  assert.equal(
+    registry.getScene('story_eclipse', 'q6_res_road').transitions[0].target,
+    'endings:eclipse_road',
+  );
+});
+
+test('сюжетный квест Баронов даёт +15 своей фракции и −5 остальным', () => {
+  const state = baseState({
+    nav: { locationId: 'story_barons', sceneId: 'q1_finish' },
+    flags: { story: { barons: { knows_fuel_shortage: 1 } } },
+    stats: { luck: 7 },
+  });
+
+  const result = click(state, 0);
+  assert.equal(result.nextSession.resources.chips, 470);
+  assert.equal(result.nextSession.vars.repRustyBarons, 15);
+  assert.equal(result.nextSession.vars.repNeoTek, 0);
+  assert.equal(result.nextSession.vars.repEclipse, 0);
+  assert.equal(result.nextSession.flags.story.barons.q1, 1);
+});
+
+test('финал Баронов открывает протоколы по флагу отравления', () => {
+  const nav = { locationId: 'story_barons', sceneId: 'q6_valve' };
+
+  const poisoned = baseState({
+    nav,
+    flags: { story: { barons: { tract_poisoned: 1 } } },
+  });
+  assert.deepEqual(
+    render(poisoned).buttons.map(button => button.transitionIndex),
+    [0, 2],
+  );
+
+  const tyranny = click(poisoned, 0);
+  assert.equal(tyranny.nextSession.nav.sceneId, 'q6_res_tyranny');
+  assert.equal(tyranny.nextSession.flags.story.barons.q6, 1);
+  assert.equal(
+    registry.getScene('story_barons', 'q6_res_tyranny').transitions[0].target,
+    'endings:iron_progress_poisoned',
+  );
+
+  const road = click(poisoned, 2);
+  assert.equal(road.nextSession.nav.sceneId, 'q6_res_sabotage');
+  assert.equal(
+    registry.getScene('story_barons', 'q6_res_sabotage').transitions[0].target,
+    'endings:endless_road',
+  );
+
+  const clean = baseState({
+    nav,
+    flags: { story: { barons: { tract_poisoned: 0 } } },
+  });
+  assert.deepEqual(
+    render(clean).buttons.map(button => button.transitionIndex),
+    [1, 2],
+  );
+
+  const order = click(clean, 1);
+  assert.equal(order.nextSession.nav.sceneId, 'q6_res_order');
+  assert.equal(
+    registry.getScene('story_barons', 'q6_res_order').transitions[0].target,
+    'endings:barons_iron_order',
+  );
+});
+
+test('сюжетные выборы Баронов ведут в сцены-результаты с одним переходом дальше', () => {
+  const location = registry.getLocation('story_barons');
+  const sourceScenes = [
+    'q1_road', 'q1_finish',
+    'q2_road', 'q2_node', 'q2_finish',
+    'q3_night', 'q3_crossroad', 'q3_finish',
+    'q4_road', 'q4_finish',
+    'q5_road', 'q5_drill', 'q5_finish',
+    'q6_perimeter', 'q6_valve',
+  ];
+
+  for (const sceneId of sourceScenes) {
+    const scene = registry.getScene('story_barons', sceneId);
+    for (const transition of scene.transitions) {
+      if (!transition.target.startsWith('story_barons:')) continue;
+      const targetId = transition.target.split(':')[1];
+      assert.match(
+        targetId,
+        /_res_/,
         `${sceneId} должен вести в сцену-результат, а не сразу в ${targetId}`,
       );
     }

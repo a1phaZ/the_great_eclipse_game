@@ -12,7 +12,7 @@ export const newDetroit = {
         '',
         '_Пора выезжать._',
       ].join('\n'),
-      imageUrl: 'https://unsplash.com',
+      imageUrl: 'https://raw.githubusercontent.com/a1phaZ/the_great_eclipse_game/main/images/new_detroit_prologue.jpg',
       transitions: [
         { buttonText: '📻 Включить радио', target: 'new_detroit:prologue_factions' },
       ],
@@ -148,9 +148,10 @@ export const newDetroit = {
         '🌑 **Дети Затмения** — `{vars.repEclipse}/100`, звание: _{eclipse_rank}_',
         '',
         '{neo_tek_quest_hint}',
+        '{barons_quest_hint}',
+        '{eclipse_quest_hint}',
         '',
         '_Каждый квест цепочки требует репутации: 0 / 15 / 30 / 45 / 60 / 75._',
-        '_Цепочки Баронов и Затмения — в следующем обновлении._',
       ].join('\n'),
       imageUrl: 'https://unsplash.com',
       transitions: [
@@ -183,6 +184,66 @@ export const newDetroit = {
           buttonText: '🛰 «Выбор Прометея» — финал (75 реп.)',
           condition: 'flags.story.neo_tek.q5 && !flags.story.neo_tek.q6 && vars.repNeoTek >= 75',
           target: 'story_neo_tek:q6_start',
+        },
+        {
+          buttonText: '⛓ «Дым над Трактом»',
+          condition: '!flags.story.barons.q1',
+          target: 'story_barons:q1_start',
+        },
+        {
+          buttonText: '⛓ «Сухой остаток» (15 реп.)',
+          condition: 'flags.story.barons.q1 && !flags.story.barons.q2 && vars.repRustyBarons >= 15',
+          target: 'story_barons:q2_start',
+        },
+        {
+          buttonText: '⛓ «Карта мертвеца» (30 реп.)',
+          condition: 'flags.story.barons.q2 && !flags.story.barons.q3 && vars.repRustyBarons >= 30',
+          target: 'story_barons:q3_start',
+        },
+        {
+          buttonText: '⛓ «Ржавый дипломат» (45 реп.)',
+          condition: 'flags.story.barons.q3 && !flags.story.barons.q4 && vars.repRustyBarons >= 45',
+          target: 'story_barons:q4_start',
+        },
+        {
+          buttonText: '⛓ «Осквернение» (60 реп.)',
+          condition: 'flags.story.barons.q4 && !flags.story.barons.q5 && vars.repRustyBarons >= 60',
+          target: 'story_barons:q5_start',
+        },
+        {
+          buttonText: '⛓ «Железный марш» — финал (75 реп.)',
+          condition: 'flags.story.barons.q5 && !flags.story.barons.q6 && vars.repRustyBarons >= 75',
+          target: 'story_barons:q6_start',
+        },
+        {
+          buttonText: '🌑 «Пепел на ветровом стекле»',
+          condition: '!flags.story.eclipse.q1',
+          target: 'story_eclipse:q1_start',
+        },
+        {
+          buttonText: '🌑 «Экстаз частоты» (15 реп.)',
+          condition: 'flags.story.eclipse.q1 && !flags.story.eclipse.q2 && vars.repEclipse >= 15',
+          target: 'story_eclipse:q2_start',
+        },
+        {
+          buttonText: '🌑 «Священный лом» (30 реп.)',
+          condition: 'flags.story.eclipse.q2 && !flags.story.eclipse.q3 && vars.repEclipse >= 30',
+          target: 'story_eclipse:q3_start',
+        },
+        {
+          buttonText: '🌑 «Груз скорби» (45 реп.)',
+          condition: 'flags.story.eclipse.q3 && !flags.story.eclipse.q4 && vars.repEclipse >= 45',
+          target: 'story_eclipse:q4_start',
+        },
+        {
+          buttonText: '🌑 «Чёрный передатчик» (60 реп.)',
+          condition: 'flags.story.eclipse.q4 && !flags.story.eclipse.q5 && vars.repEclipse >= 60',
+          target: 'story_eclipse:q5_start',
+        },
+        {
+          buttonText: '🌑 «Последнее затмение» — финал (75 реп.)',
+          condition: 'flags.story.eclipse.q5 && !flags.story.eclipse.q6 && vars.repEclipse >= 75',
+          target: 'story_eclipse:q6_start',
         },
         { buttonText: '🎖 Награды и звания', target: 'new_detroit:faction_rewards' },
         { buttonText: '⬅️ Вернуться в бар', target: 'new_detroit:bar' },
